@@ -1,0 +1,421 @@
+---
+title: "FIT5197 Assignment 2"
+author: "Chandni_29079896"
+date: "14 October 2018"
+output:
+  html_document:
+    df_print: paged
+---
+
+#Importing Libraries
+```{r}
+library(plotly)
+library(corrgram)
+library(GGally)
+library(Metrics)
+library(leaps)
+library(caret)
+library(Metrics)
+library(car)
+library(imputeMissings)
+library(plyr)
+library(GoFKernel)
+```
+
+
+
+# Task A: Modelling - Classification
+
+
+
+###### A.1: Technique
+```{r}
+# Loading data
+loan_train = read.csv("LoanData.csv")
+# Summary of the data
+summary(loan_train)
+```
+
+* By observing the summary of loan data, we can see that there are several categorical variables like "term", "grade", "home_ownership", "verification_status" and "loan_status"    for which model linear regression cannot be used.
+* Our dependent variable is "loan_status" for which we require Logistic Regression.
+* Linear Regression would not work for our categorical values so to work upon categorical values as well, we need to use Logistic Regression.
+
+
+
+
+###### A.2 Change grade into a numeric variable or not
+```{r}
+# Checking for Grade
+grade <- as.numeric(loan_train$grade)
+summary(grade)
+```
+
+* Grade is a categorical variable. After changing grade to a numerical data type, we observe that it has been coverted into numerical type but by nature it is still categorical.
+* The levels of grade have been converted from character to numerical, so it is still a categorical variable.
+* The behaviour of grade would remain same so there won't be any change in the accuracy of the models with two different types of grades.
+
+
+
+
+###### A.3 Train a model
+```{r}
+# Training the model using Logistic Regression
+loan_glm <- glm(loan_status~.,family= binomial(link = "logit"), data = loan_train)
+summary(loan_glm)$coeff
+```
+
+##### Estimate: 
+* The coefficient Estimate contains many rows. 
+* The first one is the intercept. The intercept, in our example, is essentially the expected value of the loan_status. 
+* The rest of the rows in the Coefficients are the slopes.
+* The first slope term in our model is saying that for every unit decrease in the loan_amnt, the required loan_status goes up by 2.414 unit.
+* Similarly, for every unit decrease in the int_rate, the required loan_status goes up by 2.05 units
+
+##### Standard Error : 
+* It is the standard deviation of the coefficient point estimate . It is a measure of uncertainty about this estimate - if it is too large, then a coefficient point estimate is    calculated with a lot of imprecision.
+* The coefficient Standard Error measures the average amount that the coefficient estimates vary from the actual average value of our response variable.
+
+
+There are more rows in the coefficients table than there are variables in the data because some of the variables have categorical values which are listed for coefficients as well.
+
+
+###### A.4: Generate probabilities from your model
+```{r}
+
+# Predicting probabilities based on the model trained
+loan_test <- read.csv("LoanData_test.csv")
+loan_test$pred <- predict(loan_glm,loan_test,type='response')
+loan_test$pred
+
+```
+
+By investigating the signs of the coefficients of the predictors in the model trained, we can observe that:
+
+* int_rate has negative sign, which means if our interest rate is decreasing then our loan status would become fully paid. It means with less interest rate, loan status is         becoming clear which is "fully paid".
+
+* Similarly, we can observe for the loan_amnt that it contains negative sign which shows the similar property. It means if loan amount is decreasing then the loan is paid.
+
+* So, we can estimate from these investigations that the probabilities predicted using a model would be of loan paid, i.e., "fully paid".
+
+
+###### A.5 Convert the probabilities
+```{r}
+
+# Changing probabilities to their names
+predicted_status = rep(0, nrow(loan_test))
+for (i in 1:length(predicted_status)) {
+if (loan_test$pred[i] > 0.5) {
+predicted_status[i] = "Fully Paid"
+} else {
+predicted_status[i] = "Charged Off"
+}
+}
+
+#predicted_status
+
+# Confusion Matrix for checking the correctness of the model trained
+confusionMatrix(table(loan_test$loan_status, predicted_status))
+
+# Accuracy is 85%
+```
+By observing the confusion matrix and its statistics, we can see that 85% of the trained model predicts correctly.
+
+
+###### A.6: Consider a model which simply predicts that all loans will be fully paid.
+```{r}
+
+simple_predicted_status = rep(0, nrow(loan_test))
+for (i in 1:length(simple_predicted_status)) {
+simple_predicted_status[i] = "Fully Paid"
+}
+
+simple_predicted_status <- as.factor(simple_predicted_status)
+levels(simple_predicted_status) <- levels(loan_test$loan_status)
+confusionMatrix(loan_test$loan_status,simple_predicted_status)
+
+
+```
+
+* The accuracy of the model is very less with 14%.
+* If the simpler model predicts whether loans will be paid correctly on the test data, more often than the more complicated model, that does not mean we should prefer the simpler   model because its accuracy might be very poor and specificity too.
+
+
+
+# Task B: Modelling - Regression
+
+
+###### B.1: Treating missing values and update
+```{r}
+
+# Strategy for Treating Missing Values:
+# 1. Firstly, correlation between all the variables are checked.
+# 2. Then, linear model is created using the variable having more correlation with horsepowe, i.e, Displacement.
+# 3. Summary of the created model gives value of intercept and m  which is used for calculating the respective values of 'horsepower' using 'displacement' values.
+
+# On observing data, we get to know that there are 6 missing values for the variable "horsepower"
+
+# Reading auto_mpg_train csv file
+mpg_train <- read.csv("auto_mpg_train.csv")
+
+# Summary of the data
+summary(mpg_train)
+
+# Checking datatypes of the variables
+sapply(mpg_train, class)
+# Observation: Datatype of "horsepower" is factor
+
+# Converting datatype of horsepower from factor to character and then to numeric
+mpg_train$horsepower <- as.character(mpg_train$horsepower)
+mpg_train$horsepower <- as.numeric(mpg_train$horsepower)
+
+# Again Checking datatypes of the variables
+sapply(mpg_train, class)
+# Observation: Datatype of "horsepower" has been converted to numeric datatype
+
+# Correlation
+cor(mpg_train[,1:8], use = "complete.obs")
+# Observation: "horsepower" is most correlated to "displacement" with correlation of 0.9
+
+# Symbolic Number Coding for correlations
+symnum(cor(mpg_train[,1:8], use = "complete.obs"))
+# Observation: Same can be observed in symbolic number coding, therefore creating linear model between horsepower and displacement
+
+# lm model between horsepower and displacement
+model <- lm(horsepower ~ displacement,  mpg_train)
+summary(model)
+
+# Observations: (Intercept) =  39.988716, m = 0.3366
+c <- 39.9887
+m <- 0.3366
+
+# Checking null values
+any(is.na(mpg_train$horsepower))
+# Printing indices of null values
+which(is.na(mpg_train$horsepower))
+# Observation: 33 127 281 287 305 325
+
+# Replacing all the null values observed above
+mpg_train[33,"horsepower"] <- m*(mpg_train[33,"displacement"]) + c
+mpg_train[127,"horsepower"] <- m*(mpg_train[127,"displacement"]) + c
+mpg_train[281,"horsepower"] <- m*(mpg_train[281,"displacement"]) + c
+mpg_train[287,"horsepower"] <- m*(mpg_train[287,"displacement"]) + c
+mpg_train[305,"horsepower"] <- m*(mpg_train[305,"displacement"]) + c
+mpg_train[325,"horsepower"] <- m*(mpg_train[325,"displacement"]) + c
+
+# Again Checking null values
+any(is.na(mpg_train$horsepower))
+# Observation: Null values replaced!
+
+# write.csv(mpg_train, file = "mpg_train_modified.csv")
+```
+
+
+###### B.2:Pair plot and multiple linear regression model
+```{r}
+ggpairs(data = mpg_train[, 1:8], axisLabels = "none", switch = "both")
+
+# Explaination of Pairplot
+# In the Pairplot created, mpg has very high negative correlation with weight(-0.831) followed by displacement(-0.799) and and cylinders(-0.772).
+# mpg is positively least correlated with acceleration(0.458). 
+# mpg is fairly correlated with model.year(0.598) and origin(0.547).
+
+
+# By visualizing the correlation between mpg and other varaibles following multiple linear regression model has been created
+# weight, displacement and cylinder are highly correlated with mpg but they are highly correlated among themselves as well.
+# So keeping this in mind, weight, model.year and origin are taken for creating the model which are highly correlated with mpg but less correlated among themselves.
+
+# Multiple Linear Regression Model for predicting mpg values
+model <-lm(formula = mpg ~ weight + model.year + origin, data = mpg_train)
+
+#Summary of the model
+summary(model)
+
+# Reading auto_mpg test file 
+mpg_test = read.csv("auto_mpg_test.csv")
+
+# Predicting values of mpg using test data based on model created above using train data
+mpg_test$pred_mpg <- predict(model, newdata = mpg_test)
+print(mpg_test$pred_mpg)
+
+```
+
+###### B.3: Build the model and print the summary of the model
+```{r}
+
+# Multiple Linear Regression Model for predicting mpg values
+model <-lm(formula = mpg ~ weight + model.year + origin, data = mpg_train)
+
+# Summary of the model
+summary(model)
+
+# * R Squared Value: It is the statistical measure which measures how close the data are to the fitted line of regression. It tells how well the model is fitting the actual data.
+# * Adjusted R square value of 0.8133 tells that the fit of the regression line is fairly good.
+# * p-value:The p-value indicates if there is a significant relationship described by the model.
+
+# These imply following about the predictors for our model:
+# * To check if the residuals are standard normally distributet. The median is close to 0, and distribution is not too different to symmetric, so the residuals are fine though       perhaps could be improved. This could be caused by the dependencies between the predictors.
+# * The p-value of each predictor suggests its importance for predicting the target.
+# * According to the R-square value, The built model fits about 81% of the training data, which can be considered as a good fit.
+
+
+```
+
+###### B.4: Test the fitted model
+```{r}
+
+# Testing
+
+# Reading auto_mpg test file
+auto_mpg_test = read.csv("auto_mpg_test.csv")
+
+# Predicting values of mpg using test data based on model created above using train data
+auto_mpg_test$pred_mpg <- predict(model, newdata = auto_mpg_test)
+# print(mpg_test$pred_mpg)
+
+# Finding Mean Square Error of the actual and predicted values of mpg
+mse(auto_mpg_test$mpg, mpg_test$pred_mpg)
+
+#  Observation: Mean Square Error = 6.530443
+```
+
+###### B.5: Change to the model in an attempt to improve that model.
+```{r}
+# (origin + displacement + acceleration + weight:model.year + weight:displacement  + model.year:acceleration + origin:horsepower + origin:displacement + origin:acceleration + cylinders:acceleration) are the predictors I would use for the model because its MSE is least from the model created above.
+
+# Tring out third model with ratios
+model <-lm(formula = mpg ~ (origin + displacement + acceleration + weight:model.year + weight:displacement  + model.year:acceleration + origin:horsepower + origin:displacement + origin:acceleration + cylinders:acceleration), data = mpg_train)
+# Predicting values
+mpg_test$pred_mpg <- predict(model, newdata = mpg_test[,2:9])
+# Finding MSE
+mse(mpg_test$mpg, mpg_test$pred_mpg)
+# MSE decreased to 4.34787
+
+# It performed better than the previous model as its MSE has been decreased from 6.53 to 4.34
+
+```
+
+
+# Task C: Sampling
+
+
+###### C.1: Generate samples from your chosen probability distribution
+
+* Sampling used: Rejection Sampling
+* We are given probability density function p(x):
+
+\[ p(x) = \frac{1}{1- e^{-4}}2e^{-2x} \] for \[x \epsilon [0,2] \]
+
+* Given range is: 
+
+\[x \epsilon [0,2] \]
+
+* We can ignore the normaliser because we only need to know the shape of the target distribution.So we can write:
+
+\[ q(x) = e^{-2x}\]
+
+* Proposal Distribution can be written as:
+
+\[ p_{prop}(x) = \frac{1}{2}\]
+
+* Rejection ratio for the sampler is:
+
+\[ \frac{Cq(x)}{p_{prop}(x)} = q(x) \] where C is constant
+
+* This means we will reject x if
+
+\[U > \frac{Cq(x)}{p_{prop}(x)}\]
+
+
+```{r}
+
+# Target Distribution
+pdf_td <- function(x){
+  f <- 2 * exp(-2 * x) / (1 - exp(-4))
+  return(f) 
+}
+
+# Target Distribution without normaliser
+td <- function(x) exp(-2 * x)
+
+# Rejection Sampling
+samples = rep(0, 200)
+
+i = 1
+
+
+repeat {
+
+  if (i > 200) break
+
+  x = 2*runif(1)
+
+  ratio = td(x)
+
+  u = runif(1)
+
+  if (u < ratio) {
+
+    samples[i] = x
+
+    i = i + 1
+
+    }
+
+  }
+# plot to check
+par(mfrow = c(1,2))
+y = sapply(samples, pdf_td)
+plot(samples, y)
+hist(samples, freq = F, breaks=10)
+```
+
+
+###### C.2: Simple Bayesian Network
+
+
+###### 1. Joint Probability Distribution
+
+\[ p(cloudy) p(rainy|cloudy) p(sprinkler|cloudy) p(wetgrass|sprinkler,rain)\]
+
+###### 2. Which variables are independent of Rain?
+Two variables in a Bayesian network are independent if they don't have any common ancestors, and one is not the ancestor of another. So in this case, no variable is independent of rain because, rain has common ancestor with every (sprinkler,wetgrass) variable and cloudy is ancestor of rain as well.
+
+
+###### C.3: Conditional Probability
+```{r}
+cpt_c = c(0.5, 0.5)
+cpt_s_given_c = matrix(c(0.5, 0.5, 0.9, 0.1), 2, 2, byrow = F)
+cpt_r_given_c = matrix(c(0.8, 0.2, 0.2, 0.8), 2, 2, byrow = F)
+cpt_w_given_sr = matrix(c(1, 0.1, 0.1, 0.01, 0, 0.9, 0.9, 0.99), 2, 4, byrow = T)
+
+cpt_w_given_sr
+
+
+# p_s_given_crw: Probability of S given C, R, W
+p_s_given_crw = function(c, r, w) {
+if (r == 0) {
+ind = c(1, 2)
+} else if (r == 1) {
+ind = c(3, 4)
+}
+p = cpt_s_given_c[, c + 1] * cpt_w_given_sr[w + 1, ind]
+
+return(p / sum(p))
+}
+
+p_s_given_crw(0,1,0)
+
+```
+
+
+###### C.4: Gibbs sampling
+To estimate p(C = T|W =T) using gibbs sampling, we would use joint probability distribution using the probabilities cpt_c, cpt_s_given_c and cpt_r_given_c which would be used as:
+\[p(C = T| W = T) =  p(C) p(R|C) p(S|C)/ sum(p(C = T| W = T)) \]
+
+First we will take samples for R and S and would throw away some of the samples and would work on rest of the samples and then we will find out the asked conditional probability.
+
+
+
+
+
+
