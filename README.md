@@ -1,12 +1,12 @@
 # Data-Modelling
 # Table of Contents
 * [Introduction](#introduction)
- * [Task A: Modelling - Classification](#task-a-modelling-classification)
- * [Task B: Modelling - Regression](#task-b-modelling-regression)
- * [Task C: Sampling](#task-c-sampling)
+  * [Task A: Modelling - Classification](#task-a:modelling-classification)
+  * [Task B: Modelling - Regression](#task-b:modelling-regression)
+  * [Task C: Sampling](#task-c:sampling)
 * [Getting Started](#getting-started)
- * [Built With](#built-with)
- * [Prerequisites](#prerequisites)
+  * [Built With](#built-with)
+  * [Prerequisites](#prerequisites)
 
 
 
