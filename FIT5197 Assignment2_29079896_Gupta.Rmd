@@ -1,6 +1,6 @@
 ---
 title: "FIT5197 Assignment 2"
-author: "Chandni_29079896"
+author: "Chandni"
 date: "14 October 2018"
 output:
   html_document:
