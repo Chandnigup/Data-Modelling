@@ -1,5 +1,5 @@
 ---
-title: "FIT5197 Assignment 2"
+title: "Modelling"
 author: "Chandni"
 date: "14 October 2018"
 output:
